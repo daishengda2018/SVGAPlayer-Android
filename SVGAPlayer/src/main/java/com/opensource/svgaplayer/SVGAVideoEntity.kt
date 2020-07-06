@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
 import android.os.Build
+import android.util.Log
 import com.opensource.svgaplayer.entities.SVGAAudioEntity
 import com.opensource.svgaplayer.entities.SVGAVideoSpriteEntity
 import com.opensource.svgaplayer.proto.AudioEntity
@@ -77,6 +78,7 @@ class SVGAVideoEntity {
     internal fun init(reqWidth:Int, reqHeight:Int) {
         this.reqWidth = reqWidth
         this.reqHeight = reqHeight
+        Log.d("SVGAVideoEntity", "init reqHeight$reqHeight reqWidth$reqWidth" )
         if (mJsonMovie != null) {
             parsResourceByJson()
         } else if (movieItem != null) {
@@ -142,6 +144,7 @@ class SVGAVideoEntity {
     }
 
     private fun createBitmap(filePath: String): Bitmap? {
+        Log.d("SVGAVideoEntity", "createBitmap reqHeight$reqHeight reqWidth$reqWidth" )
         return SVGABitmapCreator.createBitmap(filePath, reqWidth, reqHeight)
     }
 
@@ -248,7 +251,7 @@ class SVGAVideoEntity {
 
     private fun setupSoundPool(entity: MovieEntity, completionBlock: () -> Unit) {
         var soundLoaded = 0
-        soundPool = generateSoundPool(entity);
+        soundPool = generateSoundPool(entity)
         soundPool?.setOnLoadCompleteListener { _, _, _ ->
             soundLoaded++
             if (soundLoaded >= entity.audios.count()) {
