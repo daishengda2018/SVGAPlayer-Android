@@ -4,9 +4,12 @@ import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
+import android.os.Build
 import com.opensource.svgaplayer.entities.SVGAAudioEntity
 import com.opensource.svgaplayer.entities.SVGAVideoSpriteEntity
+import com.opensource.svgaplayer.proto.AudioEntity
 import com.opensource.svgaplayer.proto.MovieEntity
+import com.opensource.svgaplayer.proto.MovieParams
 import com.opensource.svgaplayer.utils.BitmapUtils
 import com.opensource.svgaplayer.utils.SVGARect
 import org.json.JSONObject
@@ -20,13 +23,8 @@ import java.util.*
  */
 class SVGAVideoEntity {
 
-    protected fun finalize() {
-        this.soundPool?.release()
-        this.soundPool = null
-        this.images.clear()
-    }
-
     var antiAlias = true
+    var movieItem: MovieEntity? = null
 
     var videoSize = SVGARect(0.0, 0.0, 0.0, 0.0)
         private set
@@ -37,91 +35,206 @@ class SVGAVideoEntity {
     var frames: Int = 0
         private set
 
-
-    internal var reqHeight = 0
-    internal var reqWidth = 0
-    internal var sprites: List<SVGAVideoSpriteEntity> = listOf()
-    internal var audios: List<SVGAAudioEntity> = listOf()
+    private var reqHeight = 0
+    private var reqWidth = 0
+    internal var spriteList: List<SVGAVideoSpriteEntity> = emptyList()
+    internal var audioList: List<SVGAAudioEntity> = emptyList()
     internal var soundPool: SoundPool? = null
-    internal var images = HashMap<String, Bitmap>()
-    private var cacheDir: File
+    internal var imageMap = HashMap<String, Bitmap>()
+    private var mCacheDir: File
+    private var mJsonMovie: JSONObject? = null
 
-    constructor(obj: JSONObject, cacheDir: File) {
-        this.cacheDir = cacheDir
-        obj.optJSONObject("movie")?.let {
-            it.optJSONObject("viewBox")?.let {
-                videoSize = SVGARect(0.0, 0.0, it.optDouble("width", 0.0), it.optDouble("height", 0.0))
-            }
-            FPS = it.optInt("fps", 20)
-            frames = it.optInt("frames", 0)
-        }
-        try {
-            resetImages(obj)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } catch (e: OutOfMemoryError) {
-            e.printStackTrace()
-        }
-        resetSprites(obj)
+    constructor(json: JSONObject, cacheDir: File) {
+        mJsonMovie = json
+        mCacheDir = cacheDir
+        json.optJSONObject("movie")?.let(this::setupByJson)
     }
 
-    var movieItem: MovieEntity? = null
-
-    internal constructor(obj: MovieEntity, cacheDir: File) {
-        this.movieItem = obj
-        this.cacheDir = cacheDir
-        obj.params?.let { movieParams ->
-            videoSize = SVGARect(0.0, 0.0, (movieParams.viewBoxWidth
-                    ?: 0.0f).toDouble(), (movieParams.viewBoxHeight ?: 0.0f).toDouble())
-            FPS = movieParams.fps ?: 20
-            frames = movieParams.frames ?: 0
+    private fun setupByJson(movieObject: JSONObject) {
+        movieObject.optJSONObject("viewBox")?.let { viewBoxObject ->
+            val width = viewBoxObject.optDouble("width", 0.0)
+            val height = viewBoxObject.optDouble("height", 0.0)
+            videoSize = SVGARect(0.0, 0.0, width, height)
         }
+        FPS = movieObject.optInt("fps", 20)
+        frames = movieObject.optInt("frames", 0)
+    }
+
+    internal constructor(entity: MovieEntity, cacheDir: File) {
+        this.movieItem = entity
+        this.mCacheDir = cacheDir
+        entity.params?.let (this::setupByMovie)
+    }
+
+    private fun setupByMovie(movieParams: MovieParams) {
+        val width = (movieParams.viewBoxWidth ?: 0.0f).toDouble()
+        val height = (movieParams.viewBoxHeight ?: 0.0f).toDouble()
+        videoSize = SVGARect(0.0, 0.0, width, height)
+        FPS = movieParams.fps ?: 20
+        frames = movieParams.frames ?: 0
+    }
+
+    internal fun init(reqWidth:Int, reqHeight:Int) {
+        this.reqWidth = reqWidth
+        this.reqHeight = reqHeight
+        if (mJsonMovie != null) {
+            parsResourceByJson()
+        } else if (movieItem != null) {
+            parsResourceByMovie()
+        }
+    }
+
+    private fun parsResourceByJson() {
         try {
-            resetImages(obj)
+            parserImages(mJsonMovie!!)
         } catch (e: Exception) {
             e.printStackTrace()
         } catch (e: OutOfMemoryError) {
             e.printStackTrace()
         }
-        resetSprites(obj)
+        resetSprites(mJsonMovie!!)
+    }
+
+    private fun parsResourceByMovie() {
+        try {
+            parserImages(movieItem!!)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } catch (e: OutOfMemoryError) {
+            e.printStackTrace()
+        }
+        resetSprites(movieItem!!)
     }
 
     internal fun prepare(callback: () -> Unit) {
-        this.movieItem?.let {
-            resetAudios(it) {
+        if (movieItem == null) {
+            callback()
+        } else {
+            setupAudios(movieItem!!) {
                 callback()
-            }
-        } ?: callback()
-    }
-
-    private fun resetImages(obj: JSONObject) {
-        obj.optJSONObject("images")?.let { imgObjects ->
-            imgObjects.keys().forEach { imageKey ->
-                var filePath = cacheDir.absolutePath + "/" + imgObjects[imageKey]
-                var bitmap = if (File(filePath).exists()) createBitmap(filePath) else null
-                val bitmapKey = imageKey.replace(".matte", "")
-                if (bitmap != null) {
-                    images.put(bitmapKey, bitmap)
-                } else {
-                    // bitmap.matte : bitmap
-                    var filePath = cacheDir.absolutePath + "/" + imgObjects[imageKey] + ".png"
-                    var bitmap = if (File(filePath).exists()) createBitmap(filePath) else null
-                    if (bitmap != null) {
-                        images.put(bitmapKey, bitmap)
-                    } else {
-                        (cacheDir.absolutePath + "/" + imageKey + ".png").takeIf { File(it).exists() }?.let {
-                            createBitmap(filePath)?.let {
-                                images.put(bitmapKey, it)
-                            }
-                        }
-                    }
-                }
             }
         }
     }
 
-    private fun resetImages(obj: MovieEntity) {
-        obj.images?.entries?.forEach {
+    private fun parserImages(json: JSONObject) {
+        val imgJson = json.optJSONObject("images") ?: return
+        imgJson.keys().forEach { imgKey ->
+            val filePath = generateBitmapFilePath(imgJson[imgKey].toString(), imgKey)
+            if (filePath.isNotEmpty()) {
+                val bitmapKey = imgKey.replace(".matte", "")
+                val bitmap = createBitmap(filePath) ?: return@forEach
+                imageMap[bitmapKey] = bitmap
+            }
+        }
+    }
+
+    private fun generateBitmapFilePath(imgName: String, imgKey: String): String {
+        val path = mCacheDir.absolutePath + "/" + imgName
+        val path1 = "$path.png"
+        val path2 = mCacheDir.absolutePath + "/" + imgKey + ".png"
+
+        return when {
+            File(path).exists() -> path
+            File(path1).exists() -> path1
+            File(path2).exists() -> path2
+            else -> ""
+        }
+    }
+
+    private fun createBitmap(filePath: String): Bitmap? {
+        if (filePath.isEmpty()) {
+            return null
+        }
+        return BitmapUtils.decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
+    }
+
+    private fun parserImages(obj: MovieEntity) {
+        obj.images?.entries?.forEach { entry ->
+            val byteArray = entry.value.toByteArray()
+            if (byteArray.count() < 4) {
+                return@forEach
+            }
+            val fileTag = byteArray.slice(IntRange(0, 3))
+            if (fileTag[0].toInt() == 73 && fileTag[1].toInt() == 68 && fileTag[2].toInt() == 51) {
+                return@forEach
+            }
+            val filePath = generateBitmapFilePath(entry.value.utf8(), entry.key)
+            createBitmap(byteArray, filePath)?.let { bitmap ->
+                imageMap[entry.key] = bitmap
+            }
+        }
+    }
+
+    private fun createBitmap(byteArray: ByteArray, filePath: String): Bitmap? {
+        return BitmapUtils.decodeSampledBitmapFromByteArray(byteArray, reqWidth, reqHeight) ?: createBitmap(filePath)
+    }
+
+    private fun resetSprites(json: JSONObject) {
+        val mutableList: MutableList<SVGAVideoSpriteEntity> = mutableListOf()
+        json.optJSONArray("sprites")?.let { item ->
+            for (i in 0 until item.length()) {
+                item.optJSONObject(i)?.let { entryJson ->
+                    mutableList.add(SVGAVideoSpriteEntity(entryJson))
+                }
+            }
+        }
+        spriteList = mutableList.toList()
+    }
+
+    private fun resetSprites(entity: MovieEntity) {
+        spriteList = entity.sprites?.map {
+            return@map SVGAVideoSpriteEntity(it)
+        } ?: listOf()
+    }
+
+    private fun setupAudios(entity: MovieEntity, completionBlock: () -> Unit) {
+        if (entity.audios == null || entity.audios.isEmpty()) {
+            run(completionBlock)
+        }
+        setupSoundPool(entity, completionBlock)
+        val audiosFileMap = generateAudioFileMap(entity)
+        this.audioList = entity.audios.map { audio ->
+            return@map createSvgaAudioEntity(audio, audiosFileMap)
+        }
+    }
+
+    private fun createSvgaAudioEntity(audio: AudioEntity, audiosFileMap: HashMap<String, File>): SVGAAudioEntity {
+        val item = SVGAAudioEntity(audio)
+        val startTime = (audio.startTime ?: 0).toDouble()
+        val totalTime = (audio.totalTime ?: 0).toDouble()
+        if (totalTime.toInt() == 0) {
+            // 除数不能为 0
+            return item
+        }
+        audiosFileMap[audio.audioKey]?.let {
+            val fis = FileInputStream(it)
+            val length = fis.available().toDouble()
+            val offset = ((startTime / totalTime) * length).toLong()
+            item.soundID = soundPool?.load(fis.fd, offset, length.toLong(), 1)
+            fis.close()
+        }
+        return item
+    }
+
+    private fun generateAudioFileMap(entity: MovieEntity): HashMap<String, File> {
+        val audiosDataMap = generateAudioMap(entity)
+        val audiosFileMap = HashMap<String, File>()
+        if (audiosDataMap.count() > 0) {
+            audiosDataMap.forEach {
+                val tmpFile = File.createTempFile(it.key + "_tmp", ".mp3")
+                val fos = FileOutputStream(tmpFile)
+                fos.write(it.value)
+                fos.flush()
+                fos.close()
+                audiosFileMap[it.key] = tmpFile
+            }
+        }
+        return audiosFileMap
+    }
+
+    private fun generateAudioMap(entity: MovieEntity): HashMap<String, ByteArray> {
+        val audiosDataMap = HashMap<String, ByteArray>()
+        entity.images?.entries?.forEach {
             val imageKey = it.key
             val byteArray = it.value.toByteArray()
             if (byteArray.count() < 4) {
@@ -129,104 +242,40 @@ class SVGAVideoEntity {
             }
             val fileTag = byteArray.slice(IntRange(0, 3))
             if (fileTag[0].toInt() == 73 && fileTag[1].toInt() == 68 && fileTag[2].toInt() == 51) {
-            } else {
-                val bitmap = BitmapUtils.decodeSampledBitmapFromByteArray(byteArray,reqWidth, reqHeight)
-                if (bitmap != null) {
-                    images[imageKey] = bitmap
-                } else {
-                    it.value.utf8()?.let {
-                        var filePath = cacheDir.absolutePath + "/" + it
-                        var bitmap = if (File(filePath).exists()) createBitmap(filePath) else null
-                        if (bitmap != null) {
-                            images.put(imageKey, bitmap)
-                        } else {
-                            (cacheDir.absolutePath + "/" + imageKey + ".png").takeIf { File(it).exists() }?.let {
-                                createBitmap(it)?.let {
-                                    images.put(imageKey, it)
-                                }
-                            }
-                        }
-                    }
-                }
+                audiosDataMap[imageKey] = byteArray
+            }
+        }
+        return audiosDataMap
+    }
+
+    private fun setupSoundPool(entity: MovieEntity, completionBlock: () -> Unit) {
+        var soundLoaded = 0
+        soundPool = generateSoundPool(entity);
+        soundPool?.setOnLoadCompleteListener { _, _, _ ->
+            soundLoaded++
+            if (soundLoaded >= entity.audios.count()) {
+                completionBlock()
             }
         }
     }
 
-    private fun createBitmap(filePath: String): Bitmap? {
-        return BitmapUtils.decodeSampledBitmapFromFile(filePath, reqWidth, reqHeight)
+    private fun generateSoundPool(entity: MovieEntity) = if (Build.VERSION.SDK_INT >= 21) {
+        val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build()
+        SoundPool.Builder().setAudioAttributes(attributes)
+                .setMaxStreams(12.coerceAtMost(entity.audios.count()))
+                .build()
+    } else {
+        SoundPool(12.coerceAtMost(entity.audios.count()), AudioManager.STREAM_MUSIC, 0)
     }
 
-    private fun resetSprites(obj: JSONObject) {
-        val mutableList: MutableList<SVGAVideoSpriteEntity> = mutableListOf()
-        obj.optJSONArray("sprites")?.let {
-            for (i in 0 until it.length()) {
-                it.optJSONObject(i)?.let {
-                    mutableList.add(SVGAVideoSpriteEntity(it))
-                }
-            }
-        }
-        sprites = mutableList.toList()
+    internal fun clear() {
+        soundPool?.release()
+        soundPool = null
+        audioList = emptyList()
+        spriteList = emptyList()
+        imageMap.clear()
     }
-
-    private fun resetSprites(obj: MovieEntity) {
-        sprites = obj.sprites?.map {
-            return@map SVGAVideoSpriteEntity(it)
-        } ?: listOf()
-    }
-
-    private fun resetAudios(obj: MovieEntity, completionBlock: () -> Unit) {
-        obj.audios?.takeIf { it.isNotEmpty() }?.let { audios ->
-            var soundLoaded = 0
-            val soundPool = if (android.os.Build.VERSION.SDK_INT >= 21) {
-                SoundPool.Builder().setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).build())
-                        .setMaxStreams(Math.min(12, audios.count()))
-                        .build()
-            } else {
-                SoundPool(Math.min(12, audios.count()), AudioManager.STREAM_MUSIC, 0)
-            }
-            val audiosFile = HashMap<String, File>()
-            soundPool.setOnLoadCompleteListener { _, _, _ ->
-                soundLoaded++
-                if (soundLoaded >= audios.count()) {
-                    completionBlock()
-                }
-            }
-            val audiosData = HashMap<String, ByteArray>()
-            obj.images?.entries?.forEach {
-                val imageKey = it.key
-                val byteArray = it.value.toByteArray()
-                if (byteArray.count() < 4) {
-                    return@forEach
-                }
-                val fileTag = byteArray.slice(IntRange(0, 3))
-                if (fileTag[0].toInt() == 73 && fileTag[1].toInt() == 68 && fileTag[2].toInt() == 51) {
-                    audiosData[imageKey] = byteArray
-                }
-            }
-            if (audiosData.count() > 0) {
-                audiosData.forEach {
-                    val tmpFile = File.createTempFile(it.key + "_tmp", ".mp3")
-                    val fos = FileOutputStream(tmpFile)
-                    fos.write(it.value)
-                    fos.flush()
-                    fos.close()
-                    audiosFile[it.key] = tmpFile
-                }
-            }
-            this.audios = audios.map { audio ->
-                val item = SVGAAudioEntity(audio)
-                audiosFile[audio.audioKey]?.let {
-                    val fis = FileInputStream(it)
-                    item.soundID = soundPool.load(fis.fd, (((audio.startTime
-                            ?: 0).toDouble() / (audio.totalTime
-                            ?: 0).toDouble()) * fis.available().toDouble()).toLong(), fis.available().toLong(), 1)
-                    fis.close()
-                }
-                return@map item
-            }
-            this.soundPool = soundPool
-        } ?: kotlin.run(completionBlock)
-    }
-
 }
 
