@@ -1,4 +1,4 @@
-package com.opensource.svgaplayer.utils
+package com.opensource.svgaplayer.bitmap
 
 import android.graphics.Bitmap
 
