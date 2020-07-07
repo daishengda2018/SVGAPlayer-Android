@@ -12,8 +12,6 @@ import android.view.View
 import android.view.animation.LinearInterpolator
 import android.widget.ImageView
 import com.opensource.svgaplayer.utils.SVGARange
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.lang.ref.WeakReference
 import java.net.URL
 
@@ -73,17 +71,12 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
     }
 
     private fun parserSource(source: String) {
-        // 使用弱引用解决内存泄漏
-        val ref = WeakReference<SVGAImageView>(this)
-
-        // 在后台启动一个新的协程并继续
-        GlobalScope.launch {
-            val parser = SVGAParser(context)
-            if (source.startsWith("http://") || source.startsWith("https://")) {
-                parser.decodeFromURL(URL(source), createParseCompletion(ref))
-            } else {
-                parser.decodeFromAssets(source, createParseCompletion(ref))
-            }
+        val refImgView = WeakReference<SVGAImageView>(this)
+        val parser = SVGAParser(context)
+        if (source.startsWith("http://") || source.startsWith("https://")) {
+            parser.decodeFromURL(URL(source), createParseCompletion(refImgView))
+        } else {
+            parser.decodeFromAssets(source, createParseCompletion(refImgView))
         }
     }
 
@@ -209,7 +202,6 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
 
     private fun clear() {
         getSVGADrawable()?.cleared = true
-        // 回收内存
         getSVGADrawable()?.clear()
         // 清除对 drawable 的引用
         setImageDrawable(null)
@@ -219,11 +211,11 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
         setVideoItem(videoItem, SVGADynamicEntity())
     }
 
-    fun setVideoItem(videoItem: SVGAVideoEntity?, dynamicItem: SVGADynamicEntity = SVGADynamicEntity()) {
+    fun setVideoItem(videoItem: SVGAVideoEntity?, dynamicItem: SVGADynamicEntity?) {
         if (videoItem == null) {
             setImageDrawable(null)
         } else {
-            val drawable = SVGADrawable(videoItem, dynamicItem)
+            val drawable = SVGADrawable(videoItem, dynamicItem ?: SVGADynamicEntity())
             drawable.cleared = clearsAfterStop
             setImageDrawable(drawable)
         }
