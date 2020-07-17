@@ -18,9 +18,8 @@ import java.net.URL
 /**
  * Created by PonyCui on 2017/3/29.
  */
-@Suppress("NewApi")
-open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0, defStyleRes: Int = 0)
-    : ImageView(context, attrs, defStyleAttr, defStyleRes) {
+open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0)
+    : ImageView(context, attrs, defStyleAttr) {
 
     enum class FillMode {
         Backward,
@@ -134,7 +133,6 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
         val drawable = getSVGADrawable() ?: return
         drawable.cleared = false
         drawable.scaleType = scaleType
-        drawable.videoItem.init(width, height)
     }
 
     private fun getSVGADrawable(): SVGADrawable? {
@@ -184,6 +182,13 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
         callback?.onFinished()
     }
 
+    private fun clear() {
+        getSVGADrawable()?.cleared = true
+        getSVGADrawable()?.clear()
+        // 清除对 drawable 的引用
+        setImageDrawable(null)
+    }
+
     fun pauseAnimation() {
         stopAnimation(false)
         callback?.onPause()
@@ -198,13 +203,6 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
         mAnimator?.removeAllListeners()
         mAnimator?.removeAllUpdateListeners()
         getSVGADrawable()?.cleared = clear
-    }
-
-    private fun clear() {
-        getSVGADrawable()?.cleared = true
-        getSVGADrawable()?.clear()
-        // 清除对 drawable 的引用
-        setImageDrawable(null)
     }
 
     fun setVideoItem(videoItem: SVGAVideoEntity?) {

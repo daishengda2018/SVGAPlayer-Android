@@ -5,6 +5,8 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.SoundPool
 import android.os.Build
+import com.opensource.svgaplayer.bitmap.SVGABitmapByteArrayDecoder
+import com.opensource.svgaplayer.bitmap.SVGABitmapFileDecoder
 import com.opensource.svgaplayer.entities.SVGAAudioEntity
 import com.opensource.svgaplayer.entities.SVGAVideoSpriteEntity
 import com.opensource.svgaplayer.proto.AudioEntity
@@ -34,19 +36,30 @@ class SVGAVideoEntity {
     var frames: Int = 0
         private set
 
-    private var reqHeight = 0
-    private var reqWidth = 0
     internal var spriteList: List<SVGAVideoSpriteEntity> = emptyList()
     internal var audioList: List<SVGAAudioEntity> = emptyList()
     internal var soundPool: SoundPool? = null
     internal var imageMap = HashMap<String, Bitmap>()
     private var mCacheDir: File
-    private var mJsonMovie: JSONObject? = null
+    private var mFrameHeight = 0
+    private var mFrameWidth = 0
 
-    constructor(json: JSONObject, cacheDir: File) {
-        mJsonMovie = json
+    constructor(json: JSONObject, cacheDir: File) : this(json, cacheDir, 0, 0)
+
+    constructor(json: JSONObject, cacheDir: File, frameWidth: Int, frameHeight: Int) {
+        mFrameWidth = frameWidth
+        mFrameHeight = frameHeight
         mCacheDir = cacheDir
-        json.optJSONObject("movie")?.let(this::setupByJson)
+        val movieJsonObject = json.optJSONObject("movie") ?: return
+        setupByJson(movieJsonObject)
+        try {
+            parserImages(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } catch (e: OutOfMemoryError) {
+            e.printStackTrace()
+        }
+        resetSprites(json)
     }
 
     private fun setupByJson(movieObject: JSONObject) {
@@ -59,10 +72,22 @@ class SVGAVideoEntity {
         frames = movieObject.optInt("frames", 0)
     }
 
-    internal constructor(entity: MovieEntity, cacheDir: File) {
-        this.movieItem = entity
+    constructor(entity: MovieEntity, cacheDir: File) : this(entity, cacheDir, 0, 0)
+
+    constructor(entity: MovieEntity, cacheDir: File, frameWidth: Int, frameHeight: Int) {
+        this.mFrameWidth = frameWidth
+        this.mFrameHeight = frameHeight
         this.mCacheDir = cacheDir
-        entity.params?.let (this::setupByMovie)
+        this.movieItem = entity
+        entity.params?.let(this::setupByMovie)
+        try {
+            parserImages(entity)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } catch (e: OutOfMemoryError) {
+            e.printStackTrace()
+        }
+        resetSprites(entity)
     }
 
     private fun setupByMovie(movieParams: MovieParams) {
@@ -71,38 +96,6 @@ class SVGAVideoEntity {
         videoSize = SVGARect(0.0, 0.0, width, height)
         FPS = movieParams.fps ?: 20
         frames = movieParams.frames ?: 0
-    }
-
-    internal fun init(reqWidth:Int, reqHeight:Int) {
-        this.reqWidth = reqWidth
-        this.reqHeight = reqHeight
-        if (mJsonMovie != null) {
-            parsResourceByJson()
-        } else if (movieItem != null) {
-            parsResourceByMovie()
-        }
-    }
-
-    private fun parsResourceByJson() {
-        try {
-            parserImages(mJsonMovie!!)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } catch (e: OutOfMemoryError) {
-            e.printStackTrace()
-        }
-        resetSprites(mJsonMovie!!)
-    }
-
-    private fun parsResourceByMovie() {
-        try {
-            parserImages(movieItem!!)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } catch (e: OutOfMemoryError) {
-            e.printStackTrace()
-        }
-        resetSprites(movieItem!!)
     }
 
     internal fun prepare(callback: () -> Unit) {
@@ -144,7 +137,7 @@ class SVGAVideoEntity {
     }
 
     private fun createBitmap(filePath: String): Bitmap? {
-        return SVGABitmapDecoder.decodeBitmapFromFile(filePath, reqWidth, reqHeight)
+        return SVGABitmapFileDecoder.decodeBitmapFrom(filePath, mFrameWidth, mFrameHeight)
     }
 
     private fun parserImages(obj: MovieEntity) {
@@ -165,7 +158,7 @@ class SVGAVideoEntity {
     }
 
     private fun createBitmap(byteArray: ByteArray, filePath: String): Bitmap? {
-        val bitmap = SVGABitmapDecoder.decodeBitmapFromByteArray(byteArray, reqWidth, reqHeight)
+        val bitmap = SVGABitmapByteArrayDecoder.decodeBitmapFrom(byteArray, mFrameWidth, mFrameHeight)
         return bitmap ?: createBitmap(filePath)
     }
 
