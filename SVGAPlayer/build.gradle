@@ -13,6 +13,9 @@ android {
         versionCode 2
         versionName "2.5.5.2-SNAPSHOT"
     }
+    compileOptions {
+        kotlinOptions.freeCompilerArgs += ['-module-name', "com.opensource.svgaplayer"]
+    }
     buildTypes {
         release {
             minifyEnabled false
