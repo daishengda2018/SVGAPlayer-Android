@@ -41,7 +41,7 @@ class SVGAParser(context: Context?) {
 
         var noCache = false
 
-        open fun resume(url: URL, complete: (inputStream: InputStream) -> Unit, failure: (e: Exception) -> Unit): () -> Unit {
+        open fun resume(url: URL, complete: (inputStream: InputStream) -> Unit, failure: (e: Throwable) -> Unit): () -> Unit {
             var cancelled = false
             val cancelBlock = {
                 cancelled = true
@@ -79,7 +79,7 @@ class SVGAParser(context: Context?) {
                             }
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     e.printStackTrace()
                     failure(e)
                 }
@@ -126,7 +126,7 @@ class SVGAParser(context: Context?) {
                     this.decodeFromInputStream(it, buildCacheKey("file:///assets/$name"), callback, true)
                 }
             }
-        } catch (e: java.lang.Exception) {
+        } catch (e: Throwable) {
             this.invokeErrorCallback(e, callback)
         }
     }
@@ -211,7 +211,7 @@ class SVGAParser(context: Context?) {
         }
     }
 
-    private fun invokeErrorCallback(e: java.lang.Exception, callback: ParseCompletion?) {
+    private fun invokeErrorCallback(e: Throwable, callback: ParseCompletion?) {
         e.printStackTrace()
         if (mContextRef.get() == null) {
             Log.e("SVGAParser", "在配置 SVGAParser context 前, 无法解析 SVGA 文件。")
@@ -236,7 +236,7 @@ class SVGAParser(context: Context?) {
                     FileInputStream(binaryFile).use {
                         this.invokeCompleteCallback(SVGAVideoEntity(MovieEntity.ADAPTER.decode(it), cacheDir, mFrameWidth, mFrameHeight), callback)
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     cacheDir.delete()
                     binaryFile.delete()
                     throw e
@@ -261,13 +261,13 @@ class SVGAParser(context: Context?) {
                             }
                         }
                     }
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
                     cacheDir.delete()
                     jsonFile.delete()
                     throw e
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             this.invokeErrorCallback(e, callback)
         }
     }
@@ -288,37 +288,44 @@ class SVGAParser(context: Context?) {
     private fun buildCacheDir(cacheKey: String): File = File(mContextRef.get()?.cacheDir?.absolutePath + "/" + cacheKey + "/")
 
     private fun readAsBytes(inputStream: InputStream): ByteArray? {
-        ByteArrayOutputStream().use { byteArrayOutputStream ->
-            val byteArray = ByteArray(2048)
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        val byteArray = ByteArray(2048)
+        return try {
             while (true) {
                 val count = inputStream.read(byteArray, 0, 2048)
                 if (count <= 0) {
                     break
-                }
-                else {
+                } else {
                     byteArrayOutputStream.write(byteArray, 0, count)
                 }
             }
-            return byteArrayOutputStream.toByteArray()
+            byteArrayOutputStream.toByteArray()
+        } catch (e: Throwable) {
+            byteArrayOutputStream.close()
+            null
         }
     }
 
     private fun inflate(byteArray: ByteArray): ByteArray? {
-        val inflater = Inflater()
-        inflater.setInput(byteArray, 0, byteArray.size)
-        val inflatedBytes = ByteArray(2048)
-        ByteArrayOutputStream().use { inflatedOutputStream ->
+        val inflatedOutputStream = ByteArrayOutputStream()
+        return try {
+            val inflater = Inflater()
+            inflater.setInput(byteArray, 0, byteArray.size)
+            val inflatedBytes = ByteArray(2048)
+
             while (true) {
                 val count = inflater.inflate(inflatedBytes, 0, 2048)
                 if (count <= 0) {
                     break
-                }
-                else {
+                } else {
                     inflatedOutputStream.write(inflatedBytes, 0, count)
                 }
             }
             inflater.end()
-            return inflatedOutputStream.toByteArray()
+            inflatedOutputStream.toByteArray()
+        } catch (e: Throwable) {
+            inflatedOutputStream.close()
+            null
         }
     }
 
@@ -349,7 +356,7 @@ class SVGAParser(context: Context?) {
                         }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 cacheDir.delete()
                 throw e
             }
