@@ -54,12 +54,11 @@ class SVGAVideoEntity {
         setupByJson(movieJsonObject)
         try {
             parserImages(json)
-        } catch (e: Exception) {
+            resetSprites(json)
+        } catch (e: Throwable) {
             e.printStackTrace()
-        } catch (e: OutOfMemoryError) {
-            e.printStackTrace()
+            clear()
         }
-        resetSprites(json)
     }
 
     private fun setupByJson(movieObject: JSONObject) {
@@ -82,12 +81,11 @@ class SVGAVideoEntity {
         entity.params?.let(this::setupByMovie)
         try {
             parserImages(entity)
-        } catch (e: Exception) {
+            resetSprites(entity)
+        } catch (e: Throwable) {
             e.printStackTrace()
-        } catch (e: OutOfMemoryError) {
-            e.printStackTrace()
+            clear()
         }
-        resetSprites(entity)
     }
 
     private fun setupByMovie(movieParams: MovieParams) {
