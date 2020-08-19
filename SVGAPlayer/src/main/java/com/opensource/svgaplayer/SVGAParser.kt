@@ -191,7 +191,7 @@ class SVGAParser(context: Context?) {
                         } ?: LogUtils.error(TAG, "inflate(bytes) cause exception")
                     }
                 } ?: LogUtils.error(TAG, "readAsBytes(inputStream) cause exception")
-            } catch (Throwable) {
+            } catch (e: Throwable) {
                 this.invokeErrorCallback(e, callback)
             } finally {
                 if (closeInputStream) {
