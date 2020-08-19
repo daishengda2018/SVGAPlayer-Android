@@ -168,7 +168,7 @@ class SVGAParser(context: Context?) {
                         }
                     }
                 }
-            } catch (e: java.lang.Exception) {
+            } catch (e: Throwable) {
                 this.invokeErrorCallback(e, callback)
             } finally {
                 if (closeInputStream) {
