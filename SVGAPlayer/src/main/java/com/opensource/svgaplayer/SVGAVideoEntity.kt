@@ -135,7 +135,7 @@ class SVGAVideoEntity {
     }
 
     private fun createBitmap(filePath: String): Bitmap? {
-        return SVGABitmapFileDecoder.decodeBitmapFrom(filePath, mFrameWidth, mFrameHeight)
+        return SVGABitmapFileDecoder().decodeBitmapFrom(filePath, mFrameWidth, mFrameHeight)
     }
 
     private fun parserImages(obj: MovieEntity) {
@@ -156,7 +156,7 @@ class SVGAVideoEntity {
     }
 
     private fun createBitmap(byteArray: ByteArray, filePath: String): Bitmap? {
-        val bitmap = SVGABitmapByteArrayDecoder.decodeBitmapFrom(byteArray, mFrameWidth, mFrameHeight)
+        val bitmap = SVGABitmapByteArrayDecoder().decodeBitmapFrom(byteArray, mFrameWidth, mFrameHeight)
         return bitmap ?: createBitmap(filePath)
     }
 

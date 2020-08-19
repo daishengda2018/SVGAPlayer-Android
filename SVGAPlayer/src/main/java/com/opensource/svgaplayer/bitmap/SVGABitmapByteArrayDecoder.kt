@@ -8,7 +8,7 @@ import android.graphics.BitmapFactory
  *
  * Create by im_dsd 2020/7/7 17:50
  */
-internal object SVGABitmapByteArrayDecoder : SVGABitmapDecoder<ByteArray>() {
+internal class SVGABitmapByteArrayDecoder : SVGABitmapDecoder<ByteArray>() {
 
     override fun onDecode(data: ByteArray, ops: BitmapFactory.Options): Bitmap? {
         return BitmapFactory.decodeByteArray(data, 0, data.count(), ops)
