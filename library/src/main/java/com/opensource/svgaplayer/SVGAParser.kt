@@ -132,10 +132,8 @@ class SVGAParser(context: Context?) {
         }
         try {
             LogUtils.info(TAG, "================ decode from assets ================")
-            threadPoolExecutor.execute {
-                mContextRef.get()?.assets?.open(name)?.let {
-                    this.decodeFromInputStream(it, buildCacheKey("file:///assets/$name"), callback, true)
-                }
+            mContextRef.get()?.assets?.open(name)?.let {
+                this.decodeFromInputStream(it, buildCacheKey("file:///assets/$name"), callback, true)
             }
         } catch (e: Throwable) {
             this.invokeErrorCallback(e, callback)
@@ -146,12 +144,9 @@ class SVGAParser(context: Context?) {
         LogUtils.info(TAG, "================ decode from url ================")
         if (this.isCached(buildCacheKey(url))) {
             LogUtils.info(TAG, "this url cached")
-            threadPoolExecutor.execute {
-                this.decodeFromCacheKey(buildCacheKey(url), callback)
-            }
+            this.decodeFromCacheKey(buildCacheKey(url), callback)
             return null
-        }
-        else {
+        } else {
             LogUtils.info(TAG, "no cached, prepare to download")
             return fileDownloader.resume(url, {
                 this.decodeFromInputStream(it, this.buildCacheKey(url), callback)
@@ -163,6 +158,9 @@ class SVGAParser(context: Context?) {
 
     fun decodeFromInputStream(inputStream: InputStream, cacheKey: String, callback: ParseCompletion?, closeInputStream: Boolean = false) {
         LogUtils.info(TAG, "================ decode from input stream ================")
+        // 转变为常量防止多线程执行过程中被修改
+        val frameWidth = mFrameWidth
+        val frameHeight = mFrameHeight
         threadPoolExecutor.execute {
             try {
                 readAsBytes(inputStream)?.let { bytes ->
@@ -185,7 +183,7 @@ class SVGAParser(context: Context?) {
                     } else {
                         LogUtils.info(TAG, "decode from input stream, inflate start")
                         inflate(bytes)?.let {
-                            val videoItem = SVGAVideoEntity(MovieEntity.ADAPTER.decode(it), File(cacheKey), mFrameWidth, mFrameHeight)
+                            val videoItem = SVGAVideoEntity(MovieEntity.ADAPTER.decode(it), File(cacheKey), frameWidth, frameHeight)
                             videoItem.prepare {
                                 LogUtils.info(TAG, "decode from input stream, inflate end")
                                 this.invokeCompleteCallback(videoItem, callback)
@@ -256,6 +254,9 @@ class SVGAParser(context: Context?) {
     private fun decodeFromCacheKey(cacheKey: String, callback: ParseCompletion?) {
         LogUtils.info(TAG, "================ decode from cache ================")
         LogUtils.debug(TAG, "decodeFromCacheKey called with cacheKey : $cacheKey")
+        // 转变为常量防止多线程执行过程中被修改
+        val frameWidth = mFrameWidth
+        val frameHeight = mFrameHeight
         if (mContextRef.get() == null) {
             LogUtils.error(TAG, "在配置 SVGAParser context 前, 无法解析 SVGA 文件。")
         }
@@ -266,7 +267,7 @@ class SVGAParser(context: Context?) {
                     LogUtils.info(TAG, "binary change to entity")
                     FileInputStream(binaryFile).use {
                         LogUtils.info(TAG, "binary change to entity success")
-                        this.invokeCompleteCallback(SVGAVideoEntity(MovieEntity.ADAPTER.decode(it), cacheDir, mFrameWidth, mFrameHeight), callback)
+                        this.invokeCompleteCallback(SVGAVideoEntity(MovieEntity.ADAPTER.decode(it), cacheDir, frameWidth, frameHeight), callback)
                     }
                 } catch (e: Throwable) {
                     LogUtils.error(TAG, "binary change to entity fail", e)
@@ -396,11 +397,8 @@ class SVGAParser(context: Context?) {
                         zipInputStream.closeEntry()
                     }
                 }
-            } catch (e: Throwable) {
-                cacheDir.delete()
-                throw e
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             LogUtils.error(TAG, "================ unzip error ================")
             LogUtils.error(TAG, "error", e)
             cacheDir.delete()
