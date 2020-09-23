@@ -34,7 +34,7 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
 
     var loops = 0
     var clearsAfterStop = true
-    var clearsAfterDetached = true
+    var isClearOnDetachedFromWindow = true
     var fillMode: FillMode = FillMode.Forward
     var callback: SVGACallback? = null
 
@@ -271,7 +271,7 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         stopAnimation(true)
-        if (clearsAfterDetached) {
+        if (isClearOnDetachedFromWindow) {
             clear()
         }
     }

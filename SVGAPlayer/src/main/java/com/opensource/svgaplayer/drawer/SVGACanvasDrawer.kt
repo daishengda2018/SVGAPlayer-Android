@@ -2,12 +2,12 @@ package com.opensource.svgaplayer.drawer
 
 import android.graphics.*
 import android.os.Build
-import android.text.*
+import android.text.StaticLayout
+import android.text.TextUtils
 import android.widget.ImageView
 import com.opensource.svgaplayer.SVGADynamicEntity
 import com.opensource.svgaplayer.SVGAVideoEntity
 import com.opensource.svgaplayer.entities.SVGAVideoShapeEntity
-import java.lang.Exception
 
 /**
  * Created by cuiminghui on 2017/3/29.
@@ -240,16 +240,19 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
                     textBitmap = it
                 } ?: kotlin.run {
                     textBitmap = Bitmap.createBitmap(drawingBitmap.width, drawingBitmap.height, Bitmap.Config.ARGB_8888)
+                    if (textBitmap == null) {
+                        return@run
+                    }
                     val drawRect = Rect(0, 0, drawingBitmap.width, drawingBitmap.height)
-                    val textCanvas = Canvas(textBitmap)
+                    val textCanvas = Canvas(textBitmap!!)
                     drawingTextPaint.isAntiAlias = true
                     drawingTextPaint.setStyle(Paint.Style.FILL);
                     drawingTextPaint.setTextAlign(Paint.Align.CENTER);
                     val fontMetrics = drawingTextPaint.getFontMetrics();
                     val top = fontMetrics.top
                     val bottom = fontMetrics.bottom
-                    val baseLineY = drawRect.centerY() - top/2 - bottom/2
-                    textCanvas.drawText(drawingText, drawRect.centerX().toFloat(),baseLineY,drawingTextPaint);
+                    val baseLineY = drawRect.centerY() - top / 2 - bottom / 2
+                    textCanvas.drawText(drawingText, drawRect.centerX().toFloat(), baseLineY, drawingTextPaint);
                     drawTextCache.put(imageKey, textBitmap as Bitmap)
                 }
             }
@@ -260,12 +263,14 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
                 textBitmap = it
             } ?: kotlin.run {
                 it.paint.isAntiAlias = true
-
                 textBitmap = Bitmap.createBitmap(drawingBitmap.width, drawingBitmap.height, Bitmap.Config.ARGB_8888)
-                val textCanvas = Canvas(textBitmap)
+                if (textBitmap == null) {
+                    return@run
+                }
+                val textCanvas = Canvas(textBitmap!!)
                 textCanvas.translate(0f, ((drawingBitmap.height - it.height) / 2).toFloat())
                 it.draw(textCanvas)
-                drawTextCache.put(imageKey, textBitmap as Bitmap)
+                drawTextCache[imageKey] = textBitmap as Bitmap
             }
         }
 
@@ -274,12 +279,14 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
                 textBitmap = it
             } ?: kotlin.run {
                 it.paint.isAntiAlias = true
-                var layout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    var lineMax = try {
+                val layout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val lineMax = try {
                         val field = StaticLayout::class.java.getDeclaredField("mMaximumVisibleLineCount")
                         field.isAccessible = true
                         field.getInt(it)
-                    } catch (e: Exception) { Int.MAX_VALUE }
+                    } catch (e: Exception) {
+                        Int.MAX_VALUE
+                    }
                     StaticLayout.Builder
                             .obtain(it.text, 0, it.text.length, it.paint, drawingBitmap.width)
                             .setAlignment(it.alignment)
@@ -290,10 +297,13 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
                     StaticLayout(it.text, 0, it.text.length, it.paint, drawingBitmap.width, it.alignment, it.spacingMultiplier, it.spacingAdd, false)
                 }
                 textBitmap = Bitmap.createBitmap(drawingBitmap.width, drawingBitmap.height, Bitmap.Config.ARGB_8888)
-                val textCanvas = Canvas(textBitmap)
+                if (textBitmap == null) {
+                    return@run
+                }
+                val textCanvas = Canvas(textBitmap!!)
                 textCanvas.translate(0f, ((drawingBitmap.height - layout.height) / 2).toFloat())
                 layout.draw(textCanvas)
-                drawTextCache.put(imageKey, textBitmap as Bitmap)
+                drawTextCache[imageKey] = textBitmap as Bitmap
             }
         }
         textBitmap?.let { textBitmap ->
@@ -501,12 +511,8 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
         fun shareMatteCanvas(width: Int, height: Int): Canvas {
             if (shareMatteCanvas == null) {
                 sharedMatteBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
-//                shareMatteCanvas = Canvas(sharedMatteBitmap)
             }
-//            val matteCanvas = shareMatteCanvas as Canvas
-//            matteCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-//            return matteCanvas
-            return Canvas(sharedMatteBitmap)
+            return if (sharedMatteBitmap == null) Canvas() else Canvas(sharedMatteBitmap!!)
         }
     }
 
@@ -525,9 +531,9 @@ internal class SVGACanvasDrawer(videoItem: SVGAVideoEntity, val dynamicItem: SVG
         }
 
         fun buildPath(shape: SVGAVideoShapeEntity): Path {
-            if(!this.cache.containsKey(shape)){
+            if (!this.cache.containsKey(shape) && shape.shapePath != null) {
                 val path = Path()
-                path.set(shape.shapePath)
+                path.set(shape.shapePath!!)
                 this.cache[shape] = path
             }
             return this.cache[shape]!!
