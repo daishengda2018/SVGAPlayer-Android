@@ -6,7 +6,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import android.util.AttributeSet
-import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.LinearInterpolator
@@ -188,7 +187,7 @@ open class SVGAImageView @JvmOverloads constructor(context: Context, attrs: Attr
         callback?.onFinished()
     }
 
-    fun clear() {
+    open fun clear() {
         getSVGADrawable()?.cleared = true
         getSVGADrawable()?.clear()
         // 清除对 drawable 的引用
